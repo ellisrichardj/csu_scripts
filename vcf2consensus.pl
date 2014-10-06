@@ -72,7 +72,7 @@ Options: -d INT    minimum depth                   [$opts{d}]
  
  close($fastaFile);
 
- my %het = (AC=>'M', AG=>'R', AT=>'W', CA=>'M', CG=>'S', CT=>'Y',
+ my %het = (AC=>'M', AG=>'R', AT=>'W', CA=>'M', CG=>'S', CT=>'Y', CGT=>'B', AGT=>'D', ACT=>'H', ACG=>'V',
 			 GA=>'R', GC=>'S', GT=>'K', TA=>'W', TC=>'Y', TG=>'K');
 
   $last_chr = '';
