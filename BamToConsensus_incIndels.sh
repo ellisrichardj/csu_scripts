@@ -16,7 +16,7 @@ set -e
 # Change Log
 # v0.1.1 first version 11/09/14
 # v0.1.2 added line to re-index bam after duplicate removal
-# v0.1.3 tidy up generateing of unnecessary intermeditate files by piping
+# v0.1.3 tidy up generation of unnecessary intermeditate files by piping
 
 # check for mandatory positional parameters
 if [ $# -lt 2 ]; then

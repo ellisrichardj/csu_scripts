@@ -14,10 +14,12 @@
 #
 # Can be used in conjuction with BamToConsensus_incIndels.sh for single command operation
 # 
-# version 0.1.1 24/09/14
+# version 0.1.2 08/10/14
+# version 0.1.3 21/10/14
 # 
-# Change from v0.1: Removed comment '#' from lines 96-111 to use quality scores in calculations
-#
+# Change from v0.1.1: Removed comment '#' from lines 96-111 to use quality scores in calculations
+# Change from v0.1.2: Bugfix to correct loss of first base when creating consensus
+
 
 use strict;
 use warnings;
@@ -129,13 +131,12 @@ Options: -d INT    minimum depth                   [$opts{d}]
 sub v2q_post_process {
   my ($chr, $seq, $qual, $gaps) = @_;
   for my $g (@$gaps) {
-	# blank out replaced sequence (there was an off-by-1 error in the original code)
-	substr($$seq, ($g->[0]-1), $g->[1]) = '-' x ($g->[1]);
+	substr($$seq, ($g->[0]-1), $g->[1]) = '-' x ($g->[1]); 
 	substr($$qual, ($g->[0]-1), $g->[1]) = ' ' x ($g->[1]);
     }
   my $newSeq = '';
   my $newQual = '';
-  my $seqPos = 1;
+  my $seqPos = 0;
   my $indelOffset = 0;
   for my $g (@$gaps) {
     $newSeq .= substr($$seq,$seqPos-1,($g->[0])-$seqPos);
@@ -172,7 +173,7 @@ sub v2q_print_str {
 sub usage {
   die(qq/
 Usage:   vcf2consensus.pl <command> [<arguments>]\n
-Command: consensus       VCF->fasta # or fastq - see comments at top 
+Command: consensus       VCF->fasta # or fastq - see comments in code 
 
 
 \n/);

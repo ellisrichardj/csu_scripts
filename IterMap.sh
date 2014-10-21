@@ -5,7 +5,9 @@ set -e
 # new consensus, thereby theoretically increasing coverage and accuracy of consensus
 # especially when consensus is likely to be divergent from original reference
 
-# Version 0.1.1 06/10/14
+# Version 0.1.1 06/10/14 First verison
+# Version 0.1.2 14/10/14 Reduced mapping stringency for first iteration (k, B and O options for bwa mem), allowed 
+#	inclusion of anomalous read pairs in variant calling
 
 # set defaults for the options
 iter=1
@@ -35,28 +37,43 @@ Start=$(date +%s)
 	sfile2=$(basename "$R2")
 	samplename=${sfile1%%_*}
 
-	rfile=$(basename "$Ref")
-	refname=${rfile%%_*}
+	ref=$(basename "$Ref")
+	refname=${ref%%_*}
+	reffile=${ref%%.*}
 
 mkdir "$samplename"_IterMap"$iter"
-cp "$Ref" "$samplename"_IterMap"$iter"
+cp "$Ref" "$samplename"_IterMap"$iter"/"$reffile".fas
 cp "$R1" "$samplename"_IterMap"$iter"
 cp "$R2" "$samplename"_IterMap"$iter"
 cd "$samplename"_IterMap"$iter"
 
+rfile="$reffile".fas
 count=1
+threads=$(grep -c ^processor /proc/cpuinfo)
+
 while (($count <= $iter))
 do
+# Set reduced mapping stringency for first iteration
+if [ $count == 1 ]; then
+	mem=16
+	mmpen=2
+	gappen=4
+else
+	mem=19
+	mmpen=4
+	gappen=6
+fi
+
 	# mapping to original reference or most recently generated consensus
 	bwa index "$rfile"
-	bwa mem -t 6 "$rfile" "$R1" "$R2" | samtools view -Su - | samtools sort - "$samplename"-"$refname"-iter"$count"_map_sorted
+	bwa mem -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" "$R1" "$R2" | samtools view -Su - | samtools sort - "$samplename"-"$refname"-iter"$count"_map_sorted
 
 if [ $count == $iter ]; then
 	# generate and correctly label consensus using cleaned bam on final iteration
 	samtools rmdup "$samplename"-"$refname"-iter"$count"_map_sorted.bam "$samplename"-"$refname"-iter"$count"_clean.bam
 	samtools index "$samplename"-"$refname"-iter"$count"_clean.bam
 
-samtools mpileup -uf "$rfile" "$samplename"-"$refname"-iter"$count"_clean.bam | bcftools view -cg - > "$samplename"-"$refname"-iter"$count".vcf
+samtools mpileup -Auf "$rfile" "$samplename"-"$refname"-iter"$count"_clean.bam | bcftools view -cg - > "$samplename"-"$refname"-iter"$count".vcf
 	vcf2consensus.pl consensus -f "$rfile" "$samplename"-"$refname"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$refname"-iter"$count"'/g' - > "$samplename"-"$refname"-iter"$count"_consensus.fas
 
 	# mapping statistics
@@ -65,7 +82,7 @@ samtools mpileup -uf "$rfile" "$samplename"-"$refname"-iter"$count"_clean.bam | 
 
 else
 
-	samtools mpileup -uf "$rfile" "$samplename"-"$refname"-iter"$count"_map_sorted.bam | bcftools view -cg - > "$samplename"-"$refname"-iter"$count".vcf
+	samtools mpileup -Auf "$rfile" "$samplename"-"$refname"-iter"$count"_map_sorted.bam | bcftools view -cg - > "$samplename"-"$refname"-iter"$count".vcf
 	vcf2consensus.pl consensus -f "$rfile" "$samplename"-"$refname"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$refname"-iter"$count"'/g' - > "$samplename"-"$refname"-iter"$count"_consensus.fas
 
 	# mapping statistics
@@ -74,11 +91,11 @@ else
 
 fi
 	((count=count+1))
-	echo "$rfile"
+	echo "New Consensus: "$rfile""
 done
 
 # generate pairwise alignment of reference and each new concensus
-cat "$Ref" *.fas > unaligned.fas
+cat *.fas > unaligned.fas
 clustalw -infile=unaligned.fas -outfile=Increments_aligned.fas -output=FASTA
 
 rm unaligned.fas
@@ -88,4 +105,5 @@ rm *.gz
 End=$(date +%s)
 TimeTaken=$((End-Start))
 echo "Results are in "$samplename"_IterMap"$iter""
+echo "New consensus after "$iter" iterations: "$rfile""
 echo  | awk -v D=$TimeTaken '{printf "Performed '$iter' mapping iterations in: %02d'h':%02d'm':%02d's'\n",D/(60*60),D%(60*60)/60,D%60}'
