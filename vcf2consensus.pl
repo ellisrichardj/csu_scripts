@@ -139,8 +139,8 @@ sub v2q_post_process {
   my $seqPos = 0;
   my $indelOffset = 0;
   for my $g (@$gaps) {
-    $newSeq .= substr($$seq,$seqPos-1,($g->[0])-$seqPos);
-    $newQual .= substr($$qual,$seqPos-1,($g->[0])-$seqPos);
+    $newSeq .= substr($$seq,$seqPos,($g->[0])-$seqPos);
+    $newQual .= substr($$qual,$seqPos,($g->[0])-$seqPos);
     $indelOffset = $indelOffset - (($g->[0])-$seqPos);
     $indelOffset = 0 if ($indelOffset < 0);
     $seqPos = $g->[0];

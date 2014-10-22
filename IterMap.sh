@@ -66,28 +66,28 @@ fi
 
 	# mapping to original reference or most recently generated consensus
 	bwa index "$rfile"
-	bwa mem -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" "$R1" "$R2" | samtools view -Su - | samtools sort - "$samplename"-"$refname"-iter"$count"_map_sorted
+	bwa mem -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" "$R1" "$R2" | samtools view -Su - | samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted
 
 if [ $count == $iter ]; then
 	# generate and correctly label consensus using cleaned bam on final iteration
-	samtools rmdup "$samplename"-"$refname"-iter"$count"_map_sorted.bam "$samplename"-"$refname"-iter"$count"_clean.bam
-	samtools index "$samplename"-"$refname"-iter"$count"_clean.bam
+	samtools rmdup "$samplename"-"$reffile"-iter"$count"_map_sorted.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
+	samtools index "$samplename"-"$reffile"-iter"$count"_clean.bam
 
-samtools mpileup -Auf "$rfile" "$samplename"-"$refname"-iter"$count"_clean.bam | bcftools view -cg - > "$samplename"-"$refname"-iter"$count".vcf
-	vcf2consensus.pl consensus -f "$rfile" "$samplename"-"$refname"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$refname"-iter"$count"'/g' - > "$samplename"-"$refname"-iter"$count"_consensus.fas
+samtools mpileup -Auf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
+	vcf2consensus.pl consensus -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$reffile"-iter"$count"'/g' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
 
 	# mapping statistics
-	samtools flagstat "$samplename"-"$refname"-iter"$count"_clean.bam > "$samplename"-"$refname"-iter"$count"_MappingStats.txt
-	rfile="$samplename"-"$refname"-iter"$count"_consensus.fas
+	samtools flagstat "$samplename"-"$reffile"-iter"$count"_clean.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
+	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fas
 
 else
 
-	samtools mpileup -Auf "$rfile" "$samplename"-"$refname"-iter"$count"_map_sorted.bam | bcftools view -cg - > "$samplename"-"$refname"-iter"$count".vcf
-	vcf2consensus.pl consensus -f "$rfile" "$samplename"-"$refname"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$refname"-iter"$count"'/g' - > "$samplename"-"$refname"-iter"$count"_consensus.fas
+	samtools mpileup -Auf "$rfile" "$samplename"-"$reffile"-iter"$count"_map_sorted.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
+	vcf2consensus.pl consensus -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$reffile"-iter"$count"'/g' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
 
 	# mapping statistics
-	samtools flagstat "$samplename"-"$refname"-iter"$count"_map_sorted.bam > "$samplename"-"$refname"-iter"$count"_MappingStats.txt
-	rfile="$samplename"-"$refname"-iter"$count"_consensus.fas
+	samtools flagstat "$samplename"-"$reffile"-iter"$count"_map_sorted.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
+	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fas
 
 fi
 	((count=count+1))
