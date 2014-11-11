@@ -31,7 +31,7 @@ homedir=$(pwd)
 cp "$Ref" "$homedir"
 bwa index "$ref"
 
-for file in "$DataFolder"/*_*_*_R1_*.gz
+for file in "$DataFolder"/*R1*.gz
 do
 	((Count=Count+1))
 	fname=$(basename "$file")
@@ -39,7 +39,7 @@ do
 	mkdir "$samplename"_mapto_"$refname"
 	cd "$samplename"_mapto_"$refname"	
 	echo "Mapping sample "$Count": "$samplename" to "$ref""
-	bwa mem -t "$threads" "$homedir"/"$ref" "$DataFolder"/"$samplename"_*_*_R1_*.gz "$DataFolder"/"$samplename"_*_*_R2_*.gz | samtools view -Su - | samtools sort - "$samplename"-"$refname"_map_sorted
+	bwa mem -t "$threads" "$homedir"/"$ref" "$DataFolder"/"$samplename"*R1*.gz "$DataFolder"/"$samplename"*R2*.gz | samtools view -Su - | samtools sort - "$samplename"-"$refname"_map_sorted
 	samtools index "$samplename"-"$refname"_map_sorted.bam
 	samtools flagstat "$samplename"-"$refname"_map_sorted.bam > "$samplename"-"$refname"_MappingStats.txt
 	cd "$homedir"	
