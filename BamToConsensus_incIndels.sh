@@ -11,12 +11,16 @@ set -e
 
 # **requires vcf2consensus.pl, samtools/bcftools and clustalw** 
 
-# Version 0.1.3 06/10/14
+# Version 0.1.5 27/11/14
 
 # Change Log
 # v0.1.1 first version 11/09/14
 # v0.1.2 added line to re-index bam after duplicate removal
 # v0.1.3 tidy up generation of unnecessary intermeditate files by piping
+# v0.1.4 added '-A' switch to samtools mpileup command to allow inclusion of anomalous read pairs
+#	 increased the read depth which inhibits indel calling to 2000 (added -L 1000 to samtools mpileup command)
+# v0.1.5 Added -E switch to samtools mpileup (alternate to BAQ which appears to lead to missed SNPs)
+#	In testing the -E option provided a concensus which reflected visualization of the bam file
 
 # check for mandatory positional parameters
 if [ $# -lt 2 ]; then
@@ -37,7 +41,7 @@ samtools rmdup "$BAM" "$samplename"_clean.bam
 samtools index "$samplename"_clean.bam
 
 # generate and correctly label consensus
-samtools mpileup -uf "$REF" "$samplename"_clean.bam | bcftools view -cg - > "$samplename"_"$refname".vcf
+samtools mpileup -L 2000 -AEuf "$REF" "$samplename"_clean.bam | bcftools view -cg - > "$samplename"_"$refname".vcf
 vcf2consensus.pl consensus -f "$REF" "$samplename"_"$refname".vcf  | sed '1s/.*/>'"$samplename"_mappedto_"$refname"'/g' - > "$samplename"_mappedto_"$refname"_consensus.fas
 
 # mapping statistics

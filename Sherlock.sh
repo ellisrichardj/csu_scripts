@@ -3,6 +3,8 @@ set -e
 
 # Analysis steps required to find unknown infectious agent using Illumina shotgun sequence data from DNA/RNA extracted from host tissue
 
+# Pipeline by ellisrichardj making use of some scripts written by Javier Nunez
+
 # Software required:
 	# bwa - 0.7.5a or above
 	# samtools
@@ -14,6 +16,9 @@ set -e
 	# viralDetContigs_150514.py
 # Ensure these are in PATH or symbolic links are in a folder that is in your PATH
 
+# Version 0.1.1 May 2014 Initial version
+# Version 0.1.2 25/11/14 Improved Usage guidance, added function to indicate time taken for analysis
+
 
 # set defaults for the options
 KVALUE=101
@@ -22,6 +27,7 @@ OutputDir=Sherlock_output
 BlastlngthThresh=0.5
 BlastSimThresh=0.2
 Blast_e_value=0.001
+Start=$(date +%s)
 
 # parse the options
 while getopts 's:h:e:r:l:o:c:k:' opt ; do
@@ -42,8 +48,8 @@ shift $((OPTIND-1))
 if [ $# -lt 2 ]; then
   echo "
 Usage: $0 [options] -h path to HOST genome -r path to Reference Database -o Output OutputDirectory name Read1 Read2"
-  echo "Options: De Novo assembly: -k Velvet kmervalue | -c Velvet cov_cutoff"
-  echo "Options: Blast Output: -l minimum proportion of contig length (default = 0.8) | -s  minimum similarity threshold for output (default = 0.95)
+  echo "Options: De Novo assembly: -k Velvet kmervalue (default = 101) | -c Velvet cov_cutoff (default = auto)"
+  echo "Options: Blast Output: -l minimum proportion of contig length (default = 0.5) | -s  minimum similarity threshold for output (default = 0.2) | -e Blast e value (default = 0.001)
 "
   exit 1
 fi
@@ -97,4 +103,7 @@ cd "$OutputDir"
 cp "$OutputDir"_"$KVALUE"/contigs_singletons.fa .
 cp "$PathToSearchData" ./Reference.fasta
 viralDetContigs_150514.py "$PWD" Reference.fasta "$Blast_e_value" contigs_singletons.fa "$BlastlngthThresh" "$BlastSimThresh"
+End=$(date +%s)
+TimeTaken=$((End-Start))
 echo "Results are in: "$OutputDir""
+echo  | awk -v D=$TimeTaken '{printf "Performed Sherlock Analysis in: %02d'h':%02d'm':%02d's'\n",D/(60*60),D%(60*60)/60,D%60}'

@@ -8,6 +8,10 @@ set -e
 # Version 0.1.1 06/10/14 First verison
 # Version 0.1.2 14/10/14 Reduced mapping stringency for first iteration (k, B and O options for bwa mem), allowed 
 #	inclusion of anomalous read pairs in variant calling
+# Version 0.1.4 24/11/14 increased the read depth which inhibits indel calling to 10000 from default of 250 (added -L
+#	2000 to samtools mpileup command)
+# Version 0.1.5 26/11/14 Added -E switch to samtools mpileup (alternate to BAQ which appears to lead to missed SNPs)
+#	In testing the -E option provided a concensus which reflected visualization of the bam file
 
 # set defaults for the options
 iter=1
@@ -24,7 +28,8 @@ shift $((OPTIND-1))
 # check for mandatory positional parameters
 if [ $# -lt 3 ]; then
   echo "
-Usage: $0 [-i # iterations] <path to Reference> <path to R1 fastq> <path to R1 fastq> "
+Usage: $0 [-i # iterations] <path to Reference> <path to R1 fastq> <path to R1 fastq> 
+"
 exit 1
 fi
 
@@ -73,7 +78,7 @@ if [ $count == $iter ]; then
 	samtools rmdup "$samplename"-"$reffile"-iter"$count"_map_sorted.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
 	samtools index "$samplename"-"$reffile"-iter"$count"_clean.bam
 
-samtools mpileup -Auf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
+samtools mpileup -L 10000 -AEuf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
 	vcf2consensus.pl consensus -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$reffile"-iter"$count"'/g' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
 
 	# mapping statistics
@@ -82,7 +87,7 @@ samtools mpileup -Auf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam |
 
 else
 
-	samtools mpileup -Auf "$rfile" "$samplename"-"$reffile"-iter"$count"_map_sorted.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
+	samtools mpileup -L 10000  -AEuf "$rfile" "$samplename"-"$reffile"-iter"$count"_map_sorted.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
 	vcf2consensus.pl consensus -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$reffile"-iter"$count"'/g' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
 
 	# mapping statistics
