@@ -6,6 +6,7 @@
 
 # Version 0.1.1 10/09/14
 # Version 0.1.2 14/01/15 Change commands to assume that velveth and velvetg are in PATH
+# Version 0.1.3 16/01/15 Added k-mer value to file names 
 
 # set our defaults for the options
 KVALUE=101
@@ -40,8 +41,8 @@ velveth "$DIR"_"$KVALUE" "$KVALUE" -shortPaired -fmtAuto -separate "$DIR"_R1_tri
 velvetg "$DIR"_"$KVALUE" -exp_cov auto -cov_cutoff "$CUTOFF" -clean yes -read_trkg yes -amos_file yes
 
 mv "$DIR"_"$KVALUE"/{Log,"$DIR"_Log}
-mv "$DIR"_"$KVALUE"/{contigs.fa,"$DIR"_contigs.fa}
-mv "$DIR"_"$KVALUE"/{velvet_asm.afg,"$DIR"_velvet_asm.afg}
+mv "$DIR"_"$KVALUE"/{contigs.fa,"$DIR"_"$KVALUE"_contigs.fa}
+mv "$DIR"_"$KVALUE"/{velvet_asm.afg,"$DIR"_"$KVALUE"_velvet_asm.afg}
 rm "$DIR"_R1_trim_paired.fastq
 rm "$DIR"_R2_trim_paired.fastq
 
