@@ -12,6 +12,7 @@ set -e
 # Version 0.1.2 16/01/15 - added options to change velvet parameters (kmer and cutoff)
 #			 - performs second assembly with lower kmer (-30)
 #			 - uses GARM to merge assemblies
+# Version 0.1.3 21/01/15 - Collates assembly statistics (N50, largest contig, total size, etc) for all samples and k-mers 
 
 # set our defaults for the options
 KVALUE=101
@@ -41,23 +42,32 @@ DataFolder="$1"
 Count=0
 Start=$(date +%s)
 
+echo "Sample_k-mer, Nodes, N50, MaxContig, TotalSize," >> AssemblyStats.csv
+Statsfile=$(readlink -f AssemblyStats.csv)
+
 for file in "$DataFolder"/*_*_*_R1_*.gz
 do
 	((Count=Count+1))
 	fname=$(basename "$file")
 	samplename=${fname%%_*}
 	mkdir "$samplename"_assembly
-	cp "$DataFolder"/*_*_*_R1_*.gz "$samplename"_assembly
-	cp "$DataFolder"/*_*_*_R2_*.gz "$samplename"_assembly
+	ln -s "$(readlink -f "$DataFolder"/"$samplename"_*_*_R1_*.gz)" "$samplename"_assembly/"$samplename"_R1.fastq.gz
+	ln -s "$(readlink -f "$DataFolder"/"$samplename"_*_*_R1_*.gz)" "$samplename"_assembly/"$samplename"_R2.fastq.gz
 	cd "$samplename"_assembly
+
 	echo "Assembling sample "$Count": "$samplename" with K=$KVALUE and cutoff=$CUTOFF"
-	Velvet_assemble.sh -k "$KVALUE" -c "$CUTOFF" "$samplename" "$samplename"_*_*_R1_*.gz "$samplename"_*_*_R2_*.gz
+	Velvet_assemble.sh -k "$KVALUE" -c "$CUTOFF" "$samplename" "$samplename"_R1.fastq.gz "$samplename"_R2.fastq.gz
 	Assembly1=$(readlink -f "$samplename"_"$KVALUE"/*_contigs.fa)
 	echo -e "$Assembly1""\t"$samplename"_Velvet"$KVALUE"" > "$samplename"_assemblies.txt
-	Velvet_assemble.sh -k "$LowerK" "$samplename" "$samplename"_*_*_R1_*.gz "$samplename"_*_*_R2_*.gz
+	awk '{ORS=""}/velvetg/{print $2","}/max/{print $4",",$9,$11,$13"\n"}' "$samplename"_"$KVALUE"/*Log >> $Statsfile
+	Velvet_assemble.sh -k "$LowerK" "$samplename" "$samplename"_R1.fastq.gz "$samplename"_R2.fastq.gz
+
 	Assembly2=$(readlink -f "$samplename"_"$LowerK"/*_contigs.fa)
 	echo -e "$Assembly2""\t"$samplename"_Velvet"$LowerK"" >> "$samplename"_assemblies.txt
+	awk '{ORS=""}/velvetg/{print $2","}/max/{print $4",",$9,$11,$13"\n"}' "$samplename"_"$LowerK"/*Log >> $Statsfile
+
 	GARM.pl -g "$samplename"_assemblies.txt -o "$samplename"_"$KVALUE"_"$LowerK"_merge
+
 	rm *.gz
 	cd ..
 done
