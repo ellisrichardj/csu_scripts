@@ -7,6 +7,7 @@ set -e
 # Merged files will be written to current working directory
 
 # Version 0.0.1 06/11/14
+# Version 0.1.1 22/01/15 - Altered to match sample names only rather than full file name
 
 # check for mandatory positional parameters
 if [ $# -lt 2 ]; then
@@ -18,14 +19,20 @@ fi
 Dir1="$1"
 Dir2="$2"
 
-for file in "$Dir1"/*.gz
+for file in "$Dir1"/*_*R1*.gz
 do
    	fname=$(basename "$file")
-   if [ -f "$Dir2"/"$fname" ]; then
-	echo "Merging "$fname""
-	cat "$Dir1"/"$fname" "$Dir2"/"$fname" > $PWD/$fname
+	samplename=${fname%%_*}
+	D1R1="$Dir1"/"$samplename"_*R1*.gz
+	D2R1="$Dir2"/"$samplename"_*R1*.gz
+	D1R2="$Dir1"/"$samplename"_*R2*.gz
+	D2R2="$Dir2"/"$samplename"_*R2*.gz
+   if [ -f "$D2R1" ]; then
+	echo "Merging "$samplename""
+	cat $D1R1 $D2R1 > $PWD/"$samplename"_R1.fastq.gz
+	cat $D1R2 $D2R2 > $PWD/"$samplename"_R2.fastq.gz
    else
-	echo "Matching file "$fname" does not exist in both directories: skipping"
+	echo "Matching file "$samplename" does not exist in both directories: skipping"
    fi
 done
 
