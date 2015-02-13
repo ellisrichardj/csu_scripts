@@ -9,11 +9,14 @@ set -e
 # Version 0.1.2 14/10/14 Reduced mapping stringency for first iteration (k, B and O options for bwa mem), allowed 
 #	inclusion of anomalous read pairs in variant calling
 # Version 0.1.4 24/11/14 increased the read depth which inhibits indel calling to 10000 from default of 250 (added -L
-#	2000 to samtools mpileup command)
+#	10000 to samtools mpileup command)
 # Version 0.1.5 26/11/14 Added -E switch to samtools mpileup (alternate to BAQ which appears to lead to missed SNPs)
 #	In testing the -E option provided a concensus which reflected visualization of the bam file
+# Version 0.1.6 06/02/15 Create symlinks for reference and data files rather than copyping data into new directory and 
+#	use default bwa parameters (normal stringency) is performing just a single iteration
 
 # set defaults for the options
+
 iter=1
 
 # parse the options
@@ -47,31 +50,37 @@ Start=$(date +%s)
 	reffile=${ref%%.*}
 
 mkdir "$samplename"_IterMap"$iter"
-cp "$Ref" "$samplename"_IterMap"$iter"/"$reffile".fas
-cp "$R1" "$samplename"_IterMap"$iter"
-cp "$R2" "$samplename"_IterMap"$iter"
+ln -s "$Ref" "$samplename"_IterMap"$iter"/"$reffile".fas
+ln -s "$(readlink -f "$R1")" "$samplename"_IterMap"$iter"/R1.fastq.gz
+ln -s "$(readlink -f "$R2")" "$samplename"_IterMap"$iter"/R2.fastq.gz
 cd "$samplename"_IterMap"$iter"
 
 rfile="$reffile".fas
 count=1
 threads=$(grep -c ^processor /proc/cpuinfo)
 
-while (($count <= $iter))
-do
-# Set reduced mapping stringency for first iteration
-if [ $count == 1 ]; then
-	mem=16
-	mmpen=2
-	gappen=4
-else
-	mem=19
-	mmpen=4
-	gappen=6
+#if [ $iter == 1 ]; then
+#	mem=19
+#	mmpen=4
+#	gappen=6
+#elif
+	while (($count <= $iter))
+	do
+	# Set reduced mapping stringency for first iteration
+	if [ $count == 1 ] && [ $iter != 1 ]; then
+		mem=16
+		mmpen=2
+		gappen=4
+	else
+		mem=19
+		mmpen=4
+		gappen=6
+#	fi
 fi
 
 	# mapping to original reference or most recently generated consensus
 	bwa index "$rfile"
-	bwa mem -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" "$R1" "$R2" | samtools view -Su - | samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted
+	bwa mem -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" R1.fastq.gz R2.fastq.gz | samtools view -Su - | samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted
 
 if [ $count == $iter ]; then
 	# generate and correctly label consensus using cleaned bam on final iteration
