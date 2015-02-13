@@ -8,6 +8,7 @@ set -e
 
 # Version 0.0.1 06/11/14
 # Version 0.1.1 22/01/15 - Altered to match sample names only rather than full file name
+# Version 0.1.2 10/02/15 - Allows two 'cat' processes to run concurrently
 
 # check for mandatory positional parameters
 if [ $# -lt 2 ]; then
@@ -27,10 +28,11 @@ do
 	D2R1="$Dir2"/"$samplename"_*R1*.gz
 	D1R2="$Dir1"/"$samplename"_*R2*.gz
 	D2R2="$Dir2"/"$samplename"_*R2*.gz
-   if [ -f "$D2R1" ]; then
+   if [ -f "$Dir2"/"$samplename"_*R1*.gz ]; then
 	echo "Merging "$samplename""
-	cat $D1R1 $D2R1 > $PWD/"$samplename"_R1.fastq.gz
-	cat $D1R2 $D2R2 > $PWD/"$samplename"_R2.fastq.gz
+	cat $D1R1 $D2R1 > $PWD/"$samplename"_R1.fastq.gz &
+	cat $D1R2 $D2R2 > $PWD/"$samplename"_R2.fastq.gz &
+	wait
    else
 	echo "Matching file "$samplename" does not exist in both directories: skipping"
    fi
