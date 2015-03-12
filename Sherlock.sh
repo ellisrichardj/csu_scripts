@@ -18,7 +18,7 @@ set -e
 
 # Version 0.1.1 May 2014 Initial version
 # Version 0.1.2 25/11/14 Improved Usage guidance, added function to indicate time taken for analysis
-
+# Version 0.1.3 04/03/15 Perform assembly directly from bam file rather than converting back fastq
 
 # set defaults for the options
 KVALUE=101
@@ -63,38 +63,38 @@ cp "$PathToHOST" "$OutputDir"/HostGenome.fa
 
 # Generate bwa index of host genome
 echo "Generating index of host genome" 
-/usr/local/bioinf/bwa-0.7.5a/bwa index "$OutputDir"/HostGenome.fa
+bwa index "$OutputDir"/HostGenome.fa
 
 # Map raw data to host genome
 echo "Mapping raw reads to host reference genome"
-/usr/local/bioinf/bwa-0.7.5a/bwa mem -t 6 "$OutputDir"/HostGenome.fa "$LEFT" "$RIGHT" | samtools view -Su - | samtools sort - "$OutputDir"/"$OutputDir"_Host_map_sorted
+bwa mem -t 6 "$OutputDir"/HostGenome.fa "$LEFT" "$RIGHT" | samtools view -Su - | samtools sort - "$OutputDir"/"$OutputDir"_Host_map_sorted
 
 # Extract sequence reads that do not map to the host genome
 samtools view -b -f 4 "$OutputDir"/"$OutputDir"_Host_map_sorted.bam > "$OutputDir"/"$OutputDir"_nonHost.bam
 
 # Convert non-mapping reads back to fastq format and extract all pairs
-echo "Extracting non-host raw data"
-bam2fastx -a -o "$OutputDir"/"$OutputDir"_nonHost.fasta "$OutputDir"/"$OutputDir"_nonHost.bam
-fasta_formatter -t -i "$OutputDir"/"$OutputDir"_nonHost.fasta -o "$OutputDir"/"$OutputDir"_Sequences_tab.txt
-awk < "$OutputDir"/"$OutputDir"_Sequences_tab.txt '{print $1}' > "$OutputDir"/"$OutputDir"_Sequences.lst
-rm "$OutputDir"/"$OutputDir"_nonHost.fasta
-rm "$OutputDir"/"$OutputDir"_Sequences_tab.txt
-rm "$OutputDir"/HostGenome.*
+#echo "Extracting non-host raw data"
+#bam2fastx -a -o "$OutputDir"/"$OutputDir"_nonHost.fasta "$OutputDir"/"$OutputDir"_nonHost.bam
+#fasta_formatter -t -i "$OutputDir"/"$OutputDir"_nonHost.fasta -o "$OutputDir"/"$OutputDir"_Sequences_tab.txt
+#awk < "$OutputDir"/"$OutputDir"_Sequences_tab.txt '{print $1}' > "$OutputDir"/"$OutputDir"_Sequences.lst
+#rm "$OutputDir"/"$OutputDir"_nonHost.fasta
+#rm "$OutputDir"/"$OutputDir"_Sequences_tab.txt
+#rm "$OutputDir"/HostGenome.*
 
-gunzip -c "$LEFT" > All_R1.fastq
-fastqselect -infile All_R1.fastq -name "$OutputDir"/"$OutputDir"_Sequences.lst -outfile "$OutputDir"/"$OutputDir"_R1_nonHost.fastq
-gunzip -c "$RIGHT" > All_R2.fastq
-fastqselect -infile All_R2.fastq -name "$OutputDir"/"$OutputDir"_Sequences.lst -outfile "$OutputDir"/"$OutputDir"_R2_nonHost.fastq
-rm All_R1.fastq
-rm All_R2.fastq
+#gunzip -c "$LEFT" > All_R1.fastq
+#fastqselect -infile All_R1.fastq -name "$OutputDir"/"$OutputDir"_Sequences.lst -outfile "$OutputDir"/"$OutputDir"_R1_nonHost.fastq
+#gunzip -c "$RIGHT" > All_R2.fastq
+#fastqselect -infile All_R2.fastq -name "$OutputDir"/"$OutputDir"_Sequences.lst -outfile "$OutputDir"/"$OutputDir"_R2_nonHost.fastq
+#rm All_R1.fastq
+#rm All_R2.fastq
 
 # Quality trimming and Denovo assembly of non-host reads
-let Trimlgth="$KVALUE"+10
-trimmomatic-0.30.jar PE -threads 6 -phred33 "$OutputDir"/"$OutputDir"_R1_nonHost.fastq "$OutputDir"/"$OutputDir"_R2_nonHost.fastq  "$OutputDir"/R1_nonhost_trim_paired.fastq "$OutputDir"/R1_unpaired.fastq "$OutputDir"/R2_nonhost_trim_paired.fastq "$OutputDir"/R2_unpaired.fastq ILLUMINACLIP:/home/sequence/ReferenceSequences/adapter.fasta:1:30:10:5:true MAXINFO:"$Trimlgth":0.5 MINLEN:"$Trimlgth"
-rm "$OutputDir"/R1_unpaired.fastq
-rm "$OutputDir"/R2_unpaired.fastq
-/opt/velvet/velveth "$OutputDir"/"$OutputDir"_"$KVALUE" "$KVALUE" -shortPaired -fmtAuto "$OutputDir"/R1_nonhost_trim_paired.fastq "$OutputDir"/R2_nonhost_trim_paired.fastq
-/opt/velvet/velvetg "$OutputDir"/"$OutputDir"_"$KVALUE" -exp_cov auto -cov_cutoff "$CUTOFF" -ins_length 300 -clean yes -read_trkg yes -amos_file yes -unused_reads yes
+#let Trimlgth="$KVALUE"+10
+#trimmomatic-0.30.jar PE -threads 6 -phred33 "$OutputDir"/"$OutputDir"_R1_nonHost.fastq "$OutputDir"/"$OutputDir"_R2_nonHost.fastq  "$OutputDir"/R1_nonhost_trim_paired.fastq "$OutputDir"/R1_unpaired.fastq "$OutputDir"/R2_nonhost_trim_paired.fastq "$OutputDir"/R2_unpaired.fastq ILLUMINACLIP:/home/sequence/ReferenceSequences/adapter.fasta:1:30:10:5:true MAXINFO:"$Trimlgth":0.5 MINLEN:"$Trimlgth"
+#rm "$OutputDir"/R1_unpaired.fastq
+#rm "$OutputDir"/R2_unpaired.fastq
+velveth "$OutputDir"/"$OutputDir"_"$KVALUE" "$KVALUE" -shortPaired -bam "$OutputDir"/"$OutputDir"_nonHost.bam
+velvetg "$OutputDir"/"$OutputDir"_"$KVALUE" -exp_cov auto -cov_cutoff "$CUTOFF" -ins_length 300 -clean yes -read_trkg yes -amos_file yes -unused_reads yes
 cat "$OutputDir"/"$OutputDir"_"$KVALUE"/*.fa > "$OutputDir"/"$OutputDir"_"$KVALUE"/contigs_singletons.fa
 
 # Now run Blast of output contigs and singleton reads against database of choice.  If you have some idea of what you are looking for you can limit the search to a particular taxonomic group (e.g. Rhabdoviridae).
