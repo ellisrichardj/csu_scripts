@@ -13,7 +13,8 @@ set -e
 # Version 0.1.5 26/11/14 Added -E switch to samtools mpileup (alternate to BAQ which appears to lead to missed SNPs)
 #	In testing the -E option provided a concensus which reflected visualization of the bam file
 # Version 0.1.6 06/02/15 Create symlinks for reference and data files rather than copyping data into new directory and 
-#	use default bwa parameters (normal stringency) is performing just a single iteration
+#	use default bwa parameters (normal stringency) if performing just a single iteration
+# Version 0.1.7 05/03/15 Bug fix for symlinks
 
 # set defaults for the options
 
@@ -50,7 +51,7 @@ Start=$(date +%s)
 	reffile=${ref%%.*}
 
 mkdir "$samplename"_IterMap"$iter"
-ln -s "$Ref" "$samplename"_IterMap"$iter"/"$reffile".fas
+ln -s "$(readlink -f "$Ref")" "$samplename"_IterMap"$iter"/"$reffile".fas
 ln -s "$(readlink -f "$R1")" "$samplename"_IterMap"$iter"/R1.fastq.gz
 ln -s "$(readlink -f "$R2")" "$samplename"_IterMap"$iter"/R2.fastq.gz
 cd "$samplename"_IterMap"$iter"
