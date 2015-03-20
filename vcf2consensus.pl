@@ -14,11 +14,10 @@
 #
 # Can be used in conjuction with BamToConsensus_incIndels.sh for single command operation
 # 
-# version 0.1.2 08/10/14
-# version 0.1.3 21/10/14
-# 
-# Change from v0.1.1: Removed comment '#' from lines 96-111 to use quality scores in calculations
-# Change from v0.1.2: Bugfix to correct loss of first base when creating consensus
+# version 0.1.1
+# version 0.1.2 08/10/14	Removed comment '#' from lines 96-111 to use quality scores in calculations
+# version 0.1.3 21/10/14	Bugfix to correct loss of first base when creating consensus
+# version 0.1.4 20/03/15	Changed default mimimum depth to 1 for very low coverage samples
 
 
 use strict;
@@ -37,7 +36,7 @@ sub main {
 }
 
 sub consensus {
-  my %opts = (d=>2, D=>100000, Q=>10, L=>20, f=>"");
+  my %opts = (d=>1, D=>100000, Q=>10, L=>20, f=>"");
   getopts('d:D:Q:L:f:', \%opts);
   die(qq/
 Usage:   vcf2consensus.pl consensus [options] <all-site.vcf>
