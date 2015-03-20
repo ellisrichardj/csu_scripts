@@ -3,18 +3,24 @@ set -e
 
 # script by ellisrichardj
 # This will perform denovo assembly on all samples within a directory
-# It works by running velvet with 3 different k-mer values and then merging these to produce a higher quality hybrid assembly
+# It works by running velvet with 3 different k-mer values and then merging these to produce a higher quality
+# hybrid assembly
 # Requires Velvet_assemble.sh, Velvet, CISA and trimmomatic
-# Velvet must have been compiled to allow longer k-mers and multi-threading
+# Velvet must have been (re)compiled to allow longer k-mers and multi-threading (cd to velvet directory, then
+# 	[sudo] make 'MAXKMERLENGTH=301' 'OPENMP=1' 'BIGASSEMBLY=1' 'LONGSEQUENCES=1'
 
-# Version 0.1
+# Version 0.1 initial version
 # Version 0.1.1 06/10/14 - added output for number of samples and time taken
 # Version 0.1.2 16/01/15 - added options to change velvet parameters (kmer and cutoff)
 #			 - performs second assembly with lower kmer (-30)
-# Version 0.1.3 21/01/15 - Collates assembly statistics (N50, largest contig, total size, etc) for all samples and k-mers
+# Version 0.1.3 21/01/15 - Collates assembly statistics (N50, largest contig, total size, etc) for all samples
+#			and k-mers
 # Version 0.1.4 10/02/15 - Altered wildcard/filename pattern to allow for data merged with MergeFQ.sh
 # Version 0.2.0 03/03/15 - Performs assemblies with three k-mer values and now uses CISA to merge assemblies #			generated with multiple k-mers, added comments throughout script to help understand
-#			the code
+#			what the script is doing
+# Version 0.2.1 17/03/15 - Correct small error in on-screen messages, bug in symlinks to raw data files,
+#			move final assemblies into single directory
+
 
 # set our defaults for the options
 KVALUE=101
@@ -37,7 +43,8 @@ shift $((OPTIND-1))
 # check for mandatory positional parameters
 if [ $# -lt 1 ]; then
   echo "Usage: $0 {path to Data Folder} "
-  echo "Options: -k kmervalue (def: $KVALUE, min 61) | -c cov_cutoff (def: $CUTOFF)"
+  echo "Options: -k kmervalue (default: $KVALUE; minimum value:57)"
+  echo "         -c cov_cutoff (def: $CUTOFF)"
 exit 1
 fi
 
@@ -45,9 +52,12 @@ DataFolder="$1"
 Count=0
 Start=$(date +%s)
 
-# Prepare stats file
+# Prepare stats file and final output folder
 echo "Sample_k-mer, Nodes, N50, MaxContig, TotalSize," >> AssemblyStats.csv
 Statsfile=$(readlink -f AssemblyStats.csv)
+mkdir FinalAssemblies
+OutputDir=$(pwd)/"FinalAssemblies"
+
 
 # Run assembly for each sample
 for file in "$DataFolder"/*_R1*.gz
@@ -58,7 +68,7 @@ do
 # Create new directory for each sample
 	mkdir "$samplename"_assembly
 	ln -s "$(readlink -f "$DataFolder"/"$samplename"*R1*.gz)" "$samplename"_assembly/"$samplename"_R1.fastq.gz
-	ln -s "$(readlink -f "$DataFolder"/"$samplename"*R1*.gz)" "$samplename"_assembly/"$samplename"_R2.fastq.gz
+	ln -s "$(readlink -f "$DataFolder"/"$samplename"*R2*.gz)" "$samplename"_assembly/"$samplename"_R2.fastq.gz
 	cd "$samplename"_assembly
 
 # Assemble sample using highest k-mer value
@@ -81,7 +91,7 @@ echo "Assembling sample "$Count": "$samplename" with K=$MidK and cutoff=$CUTOFF"
 	awk '{ORS=""}/velvetg/{print $2","}/max/{print $4",",$9,$11,$13"\n"}' "$samplename"_"$MidK"/*Log >> $Statsfile
 
 # Assemble sample using lowest k-mer value
-echo "Assembling sample "$Count": "$samplename" with K=$MidK and cutoff=$CUTOFF"
+echo "Assembling sample "$Count": "$samplename" with K=$LowerK and cutoff=$CUTOFF"
 
 	Velvet_assemble.sh -k "$LowerK" -c "$CUTOFF" "$samplename" "$samplename"_R1.fastq.gz "$samplename"_R2.fastq.gz
 
@@ -100,10 +110,14 @@ echo "Assembling sample "$Count": "$samplename" with K=$MidK and cutoff=$CUTOFF"
 	echo CISA=/usr/local/bioinf/CISA1.3 >> "$samplename"_CISA.config
 	CISA.py "$samplename"_CISA.config
 
+# add something here to extract CISA output assembly metrics
 
+	cp "$samplename"_CISA.fa $OutputDir
 	rm *.gz
 	cd ..
 done
+
+echo "Final Assemblies for "$Count" samples are in "$OutputDir""
 
 End=$(date +%s)
 TimeTaken=$((End-Start))
