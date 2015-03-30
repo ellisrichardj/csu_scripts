@@ -6,7 +6,9 @@
 
 # Version 0.1.1 10/09/14
 # Version 0.1.2 14/01/15 Change commands to assume that velveth and velvetg are in PATH
-# Version 0.1.3 16/01/15 Added k-mer value to file names 
+# Version 0.1.3 16/01/15 Added k-mer value to file names
+# Version 0.1.4 30/03/15 Remove options for read tracking and generation of AMOS file to improve speed
+#			and minimize disk space requirements
 
 # set our defaults for the options
 KVALUE=101
@@ -38,7 +40,7 @@ rm "$DIR"_R1_unpaired.fastq
 rm "$DIR"_R2_unpaired.fastq
 echo "Assembling with K=$KVALUE and cutoff=$CUTOFF"
 velveth "$DIR"_"$KVALUE" "$KVALUE" -shortPaired -fmtAuto -separate "$DIR"_R1_trim_paired.fastq "$DIR"_R2_trim_paired.fastq
-velvetg "$DIR"_"$KVALUE" -exp_cov auto -cov_cutoff "$CUTOFF" -clean yes -read_trkg yes -amos_file yes
+velvetg "$DIR"_"$KVALUE" -exp_cov auto -cov_cutoff "$CUTOFF" -clean yes #-read_trkg yes -amos_file yes
 
 mv "$DIR"_"$KVALUE"/{Log,"$DIR"_Log}
 mv "$DIR"_"$KVALUE"/{contigs.fa,"$DIR"_"$KVALUE"_contigs.fa}
