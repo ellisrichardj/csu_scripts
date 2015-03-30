@@ -3,6 +3,7 @@ set -e
 
 # script by ellisrichardj
 # This will perform denovo assembly on all samples within a directory
+# It has been written with prokaryotic genomes in mind
 # It works by running velvet with 3 different k-mer values and then merging these to produce a higher quality
 # hybrid assembly
 # Requires Velvet_assemble.sh, Velvet, CISA and trimmomatic
