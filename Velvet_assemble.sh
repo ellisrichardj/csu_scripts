@@ -42,9 +42,9 @@ echo "Assembling with K=$KVALUE and cutoff=$CUTOFF"
 velveth "$DIR"_"$KVALUE" "$KVALUE" -shortPaired -fmtAuto -separate "$DIR"_R1_trim_paired.fastq "$DIR"_R2_trim_paired.fastq
 velvetg "$DIR"_"$KVALUE" -exp_cov auto -cov_cutoff "$CUTOFF" -clean yes #-read_trkg yes -amos_file yes
 
-mv "$DIR"_"$KVALUE"/{Log,"$DIR"_Log}
+mv "$DIR"_"$KVALUE"/{Log,"$DIR"_Log} 
 mv "$DIR"_"$KVALUE"/{contigs.fa,"$DIR"_"$KVALUE"_contigs.fa}
-mv "$DIR"_"$KVALUE"/{velvet_asm.afg,"$DIR"_"$KVALUE"_velvet_asm.afg}
+# mv "$DIR"_"$KVALUE"/{velvet_asm.afg,"$DIR"_"$KVALUE"_velvet_asm.afg}
 rm "$DIR"_R1_trim_paired.fastq
 rm "$DIR"_R2_trim_paired.fastq
 
