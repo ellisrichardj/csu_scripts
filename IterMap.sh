@@ -2,10 +2,10 @@
 set -e
 
 # script by ellisrichardj to iteratively map and call consensus, and then remap to
-# new consensus, thereby theoretically increasing coverage and accuracy of consensus
-# especially when consensus is likely to be divergent from original reference
+# new consensus, thereby theoretically increasing coverage and accuracy of consensus,
+# especially when the consensus is likely to be divergent from original reference
 
-# Version 0.1.1 06/10/14 First verison
+# Version 0.1.1 06/10/14 Initial verison
 # Version 0.1.2 14/10/14 Reduced mapping stringency for first iteration (k, B and O options for bwa mem), allowed 
 #	inclusion of anomalous read pairs in variant calling
 # Version 0.1.4 24/11/14 increased the read depth which inhibits indel calling to 10000 from default of 250 (added -L
@@ -15,19 +15,29 @@ set -e
 # Version 0.1.6 06/02/15 Create symlinks for reference and data files rather than copyping data into new directory and 
 #	use default bwa parameters (normal stringency) if performing just a single iteration
 # Version 0.1.7 05/03/15 Bug fix for symlinks
-# Version 0.1.8 20/03/15 Added option to specify minimum expected coverage; this will alter depth variable when calling
-#	consensus from vcf; generates log file to record commands and paramaters used
+# Version 0.1.8 20/03/15 Added option to specify minimum expected coverage (this will alter depth variable when calling
+#	consensus from vcf); generates log file to record commands and paramaters used
+# Version 0.1.9 24/03/15 added -A option to bcftools view command which allows all possible variants to be retained in
+#	output; reduced bwa -T value to 10 to allow output of lower quality alignments; added -Q0 to mpileup (min map
+#	quality of bases); added -p 0.2 to bcftools view
+# Version 0.2.1	14/04/15 only remove unaligned reads from final cleaned BAM - this ensures statistics reflect proportion
+#	of mapped reads
+# Version 0.2.2 17/04/15 Add -c to bcftools view command (SNP calling)
+# Version 0.2.3 22/04/15 Changed mpileup to -Q0, removed bcftools view -c and -p 0.2, added bcftools -cg back in
+# Version 0.2.4 02/06/15 Appends iteration count to end of each fasta header
 
 # set defaults for the options
 
 iter=1
 minexpcov=5
+minQ=20
 
 # parse the options
-while getopts 'i:c:' opt ; do
+while getopts 'i:c:q:' opt ; do
   case $opt in
     i) iter=$OPTARG ;;
     c) minexpcov=$OPTARG ;;
+    q) minQ=$OPTARG ;;
   esac
 done
 # skip over the processed options
@@ -36,7 +46,7 @@ shift $((OPTIND-1))
 # check for mandatory positional parameters
 if [ $# -lt 3 ]; then
   echo "
-Usage: $0 [-i # iterations] [-c minimum expected coverage] <path to Reference> <path to R1 fastq> <path to R1 fastq> 
+Usage: $0 [-i # iterations] [-c minimum expected coverage] [-q minimum RMS quality] <path to Reference> <path to R1 fastq> <path to R1 fastq> 
 "
 exit 1
 fi
@@ -44,6 +54,7 @@ fi
 Ref=$1
 R1=$2
 R2=$3
+now=$(date '+%x %R')
 Start=$(date +%s)
 
 	sfile1=$(basename "$R1")
@@ -65,9 +76,7 @@ count=1
 if [ $minexpcov -lt 5 ]; then depth=1; else depth=10; fi
 threads=$(grep -c ^processor /proc/cpuinfo)
 
-echo "$Start
-	Itermap v0.1.8 running with $threads" > "$samplename"_IterMap"$iter".log
-
+echo -e "$now\n\tItermap v0.2.4 running with $threads cores\n\tThe following commands were run:\n"  > "$samplename"_IterMap"$iter".log
 
 
 	while (($count <= $iter))
@@ -78,44 +87,51 @@ echo "$Start
 		mmpen=2
 		gappen=4
 	else
-		mem=19
+		mem=18
 		mmpen=4
 		gappen=6
-fi
+	fi
 
 	# mapping to original reference or most recently generated consensus
 	bwa index "$rfile"
-	echo "bwa index "$rfile"" >> "$samplename"_IterMap"$iter".log
-	bwa mem -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" R1.fastq.gz R2.fastq.gz | samtools view -Su - | samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted
-	echo "bwa mem -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" R1.fastq.gz R2.fastq.gz | samtools view -Su - | samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted" >> "$samplename"_IterMap"$iter".log
+	echo -e "bwa index "$rfile"\n" >> "$samplename"_IterMap"$iter".log
+	bwa mem -T10 -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" R1.fastq.gz R2.fastq.gz |
+	 samtools view -Su - |
+	 samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted
+	echo -e "bwa mem -T10 -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" R1.fastq.gz R2.fastq.gz |\n\t samtools view -Su - |\n\t samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted\n" >> "$samplename"_IterMap"$iter".log
 
 if [ $count == $iter ]; then
 	# generate and correctly label consensus using cleaned bam on final iteration
 	samtools rmdup "$samplename"-"$reffile"-iter"$count"_map_sorted.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
-	echo "samtools rmdup "$samplename"-"$reffile"-iter"$count"_map_sorted.bam "$samplename"-"$reffile"-iter"$count"_clean.bam" >> "$samplename"_IterMap"$iter".log
-	samtools index "$samplename"-"$reffile"-iter"$count"_clean.bam
-	echo "samtools index "$samplename"-"$reffile"-iter"$count"_clean.bam" >> "$samplename"_IterMap"$iter".log
+	echo -e "samtools rmdup "$samplename"-"$reffile"-iter"$count"_map_sorted.bam "$samplename"-"$reffile"-iter"$count"_clean.bam\n" >> "$samplename"_IterMap"$iter".log
+	samtools view -bF4 -o "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
+	samtools index "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam
+	echo -e "samtools index "$samplename"-"$reffile"-iter"$count"_clean.bam\n" >> "$samplename"_IterMap"$iter".log
 
-	samtools mpileup -L 10000 -AEuf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
-	echo "samtools mpileup -L 10000 -AEuf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf" >> "$samplename"_IterMap"$iter".log
-	vcf2consensus.pl consensus -d "$minexpcov" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$reffile"-iter"$count"'/g' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
-	echo "vcf2consensus.pl consensus -d "$minexpcov" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf" >> "$samplename"_IterMap"$iter".log
+	samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam |
+	 bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
+	echo -e "samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam |\n\t bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf\n" >> "$samplename"_IterMap"$iter".log
+	vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf |
+	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
+	echo -e "vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf\n" >> "$samplename"_IterMap"$iter".log
 
 	# mapping statistics
 	samtools flagstat "$samplename"-"$reffile"-iter"$count"_clean.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
-	echo "samtools flagstat "$samplename"-"$reffile"-iter"$count"_clean.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt" >> "$samplename"_IterMap"$iter".log
+	echo -e "samtools flagstat "$samplename"-"$reffile"-iter"$count"_clean.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt\n" >> "$samplename"_IterMap"$iter".log
 	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fas
 
 else
 
-	samtools mpileup -L 10000  -AEuf "$rfile" "$samplename"-"$reffile"-iter"$count"_map_sorted.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
-	echo "samtools mpileup -L 10000  -AEuf "$rfile" "$samplename"-"$reffile"-iter"$count"_map_sorted.bam | bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf" >> "$samplename"_IterMap"$iter".log
-	vcf2consensus.pl consensus -d "$minexpcov" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf | sed '1s/.*/>'"$samplename"-"$reffile"-iter"$count"'/g' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
-	echo "vcf2consensus.pl consensus -d "$minexpcov" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf" >> "$samplename"_IterMap"$iter".log
+	samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_map_sorted.bam |
+	 bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
+	echo -e "samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_map_sorted.bam |\n\t bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf\n" >> "$samplename"_IterMap"$iter".log
+	vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf |
+	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
+	echo -e "vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf\n" >> "$samplename"_IterMap"$iter".log
 
 	# mapping statistics
 	samtools flagstat "$samplename"-"$reffile"-iter"$count"_map_sorted.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
-	echo "samtools flagstat "$samplename"-"$reffile"-iter"$count"_map_sorted.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt" >> "$samplename"_IterMap"$iter".log
+	echo -e "samtools flagstat "$samplename"-"$reffile"-iter"$count"_map_sorted.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt\n" >> "$samplename"_IterMap"$iter".log
 	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fas
 
 fi
@@ -123,7 +139,10 @@ fi
 	echo "New Consensus: "$rfile""
 done
 
-# generate pairwise alignment of reference and each new concensus
+complete=$(date '+%x %R')
+echo -e "Completed processing $complete"  >> "$samplename"_IterMap"$iter".log
+
+# generate pairwise alignment of reference and each iteration of the concensus
 cat *.fas > unaligned.fas
 clustalw -infile=unaligned.fas -outfile=Increments_aligned.fas -output=FASTA
 
