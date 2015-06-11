@@ -11,16 +11,15 @@ set -e
 
 # **requires vcf2consensus.pl, samtools/bcftools and clustalw** 
 
-# Version 0.1.5 27/11/14
-
 # Change Log
 # v0.1.1 first version 11/09/14
 # v0.1.2 added line to re-index bam after duplicate removal
 # v0.1.3 tidy up generation of unnecessary intermeditate files by piping
 # v0.1.4 added '-A' switch to samtools mpileup command to allow inclusion of anomalous read pairs
-#	 increased the read depth which inhibits indel calling to 2000 (added -L 1000 to samtools mpileup command)
+#	 increased the read depth which inhibits indel calling to 2000 (added -L 2000 to samtools mpileup command)
 # v0.1.5 Added -E switch to samtools mpileup (alternate to BAQ which appears to lead to missed SNPs)
 #	In testing the -E option provided a concensus which reflected visualization of the bam file
+# Version 0.1.6 21/05/15 bugfix to extract sample name correctly from filename
 
 # check for mandatory positional parameters
 if [ $# -lt 2 ]; then
@@ -33,8 +32,11 @@ fi
 REF="$1"
 BAM="$2"
 
-refname="${REF%.*}"
-samplename="${BAM%_*}"
+reflabel=$(basename "$REF")
+refname=${reflabel%.*}
+
+fname=$(basename "$BAM")
+samplename=${fname%%_*}
 
 # remove PCR duplicates from mapping file and re-index
 samtools rmdup "$BAM" "$samplename"_clean.bam
