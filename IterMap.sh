@@ -81,7 +81,7 @@ threads=$(grep -c ^processor /proc/cpuinfo)
 echo -e "$now\n\tItermap v0.2.4 running with $threads cores\n\tThe following commands were run:\n"  > "$samplename"_IterMap"$iter".log
 # Define function to log commands and then run them
 LogRun(){
-echo "$@\n" >> "$samplename"_IterMap"$iter".log
+echo "$@" >> "$samplename"_IterMap"$iter".log
 eval "$@"
 }
 
