@@ -5,14 +5,14 @@ set -e
 # new consensus, thereby theoretically increasing coverage and accuracy of consensus,
 # especially when the consensus is likely to be divergent from original reference
 
-# Version 0.1.1 06/10/14 Initial verison
+# Version 0.1.1 06/10/14 Initial version
 # Version 0.1.2 14/10/14 Reduced mapping stringency for first iteration (k, B and O options for bwa mem), allowed 
 #	inclusion of anomalous read pairs in variant calling
 # Version 0.1.4 24/11/14 increased the read depth which inhibits indel calling to 10000 from default of 250 (added -L
 #	10000 to samtools mpileup command)
 # Version 0.1.5 26/11/14 Added -E switch to samtools mpileup (alternate to BAQ which appears to lead to missed SNPs)
-#	In testing the -E option provided a concensus which reflected visualization of the bam file
-# Version 0.1.6 06/02/15 Create symlinks for reference and data files rather than copyping data into new directory and 
+#	In testing the -E option provided a consensus which reflected visualization of the bam file
+# Version 0.1.6 06/02/15 Create symlinks for reference and data files rather than copying data into new directory and 
 #	use default bwa parameters (normal stringency) if performing just a single iteration
 # Version 0.1.7 05/03/15 Bug fix for symlinks
 # Version 0.1.8 20/03/15 Added option to specify minimum expected coverage (this will alter depth variable when calling
