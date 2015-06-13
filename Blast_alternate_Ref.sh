@@ -31,7 +31,7 @@ mkdir "$DIR"
 cp contigs_singletons.fa "$DIR"
 cd "$DIR"
 cp "$PathToSearchData" ./Reference.fasta
-viralDetContigs_150514.py "$PWD" Reference.fasta "$BlastEvalue" contigs_singletons.fa  "$BlastlngthThresh" "$BlastSimThresh"
+viralDetContigs_new.py "$PWD" Reference.fasta "$BlastEvalue" contigs_singletons.fa  "$BlastlngthThresh" "$BlastSimThresh"
 
 
 
