@@ -9,8 +9,8 @@
 # and use samtools/bcftools to regenerate the vcf file. This can be worked into a single step
 # using the BamToConsensus_incIndels.sh script.
 #
-# Remove comment '#' from line 159 to output base qualities
-# and in line 158 change '>' to '@' for a properly formatted fastq file.
+# Remove comment '#' from line 160 to output base qualities
+# and in line 159 change '>' to '@' for a properly formatted fastq file.
 #
 # Can be used in conjuction with BamToConsensus_incIndels.sh for single command operation
 # 
@@ -18,6 +18,7 @@
 # version 0.1.2 08/10/14	Removed comment '#' from lines 96-111 to use quality scores in calculations
 # version 0.1.3 21/10/14	Bugfix to correct loss of first base when creating consensus
 # version 0.1.4 20/03/15	Changed default mimimum depth to 1 for very low coverage samples
+# version 0.1.5 17/04/15	Reduced defaults for Q and L options
 
 
 use strict;
@@ -36,7 +37,7 @@ sub main {
 }
 
 sub consensus {
-  my %opts = (d=>1, D=>100000, Q=>10, L=>20, f=>"");
+  my %opts = (d=>1, D=>100000, Q=>5, L=>10, f=>"");
   getopts('d:D:Q:L:f:', \%opts);
   die(qq/
 Usage:   vcf2consensus.pl consensus [options] <all-site.vcf>
