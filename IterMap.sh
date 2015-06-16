@@ -3,7 +3,17 @@ set -e
 
 # script by ellisrichardj to iteratively map and call consensus, and then remap to
 # new consensus, thereby theoretically increasing coverage and accuracy of consensus,
-# especially when the consensus is likely to be divergent from original reference
+# especially when the consensus is likely to be divergent from original reference.
+# Experience suggests that bewteen 3 and 5 iterations are optimal for generating an accuarate consensus.
+
+# Requirements:
+#	bwa (tested with version 0.7.x)
+#	samtools/bcftools (version 1.x)
+#	vcf2consensus.pl (latest version available at http://github.com/ellisrichardj/csu_scripts)
+#	picard-tools (.....)
+#	GenomeAnalysisToolKit (GATK v3.3+)
+#	clustalw (.....)
+
 
 # Version 0.1.1 06/10/14 Initial version
 # Version 0.1.2 14/10/14 Reduced mapping stringency for first iteration (k, B and O options for bwa mem), allowed 
@@ -26,6 +36,9 @@ set -e
 # Version 0.2.3 22/04/15 Changed mpileup to -Q0, removed bcftools view -c and -p 0.2, added bcftools -cg back in
 # Version 0.2.4 02/06/15 Appends iteration count to end of each fasta header
 # Version 0.2.5 12/06/15 Cleaned up logging of commands by defining LogRun function rather than using echo
+# Version 0.3.0 15/06/15 Adds headers to bam file during bwa mapping step.  This allows GATK to run without any additional
+#	BAM processing.  Uses GATK for local alignment around indels.  Updated to use samtools/bcftools 1.x
+
 
 # set defaults for the options
 
@@ -67,18 +80,19 @@ Start=$(date +%s)
 	reffile=${ref%%.*}
 
 mkdir "$samplename"_IterMap"$iter"
-ln -s "$(readlink -f "$Ref")" "$samplename"_IterMap"$iter"/"$reffile".fas
+ln -s "$(readlink -f "$Ref")" "$samplename"_IterMap"$iter"/"$reffile".fa
 ln -s "$(readlink -f "$R1")" "$samplename"_IterMap"$iter"/R1.fastq.gz
 ln -s "$(readlink -f "$R2")" "$samplename"_IterMap"$iter"/R2.fastq.gz
 cd "$samplename"_IterMap"$iter"
 
-rfile="$reffile".fas
+rfile="$reffile".fa
 count=1
 if [ $minexpcov -lt 5 ]; then depth=1; else depth=10; fi
+
 threads=$(grep -c ^processor /proc/cpuinfo)
 
 # Log commands that are run
-echo -e "$now\n\tItermap v0.2.4 running with $threads cores\n\tThe following commands were run:\n"  > "$samplename"_IterMap"$iter".log
+echo -e "$now\n\tItermap v0.2.5 running with $threads cores\n\tThe following commands were run:\n"  > "$samplename"_IterMap"$iter".log
 # Define function to log commands and then run them
 LogRun(){
 echo "$@" >> "$samplename"_IterMap"$iter".log
@@ -92,7 +106,7 @@ eval "$@"
 		mem=16
 		mmpen=2
 		gappen=4
-	else
+	else # bwa mem defaults
 		mem=18
 		mmpen=4
 		gappen=6
@@ -100,35 +114,42 @@ eval "$@"
 
 	# mapping to original reference or most recently generated consensus
 	LogRun bwa index "$rfile"
-	LogRun bwa mem -T10 -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" "$rfile" R1.fastq.gz R2.fastq.gz |
+	LogRun samtools faidx "$rfile"
+	LogRun picard-tools CreateSequenceDictionary R="$rfile" O="$reffile".dict
+	LogRun bwa mem -T10 -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" -R '"@RG\tID:"$samplename"\tSM:"$samplename"\tLB:"$samplename""' "$rfile" R1.fastq.gz R2.fastq.gz |
 	 samtools view -Su - |
 	 samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted
+	samtools index "$samplename"-"$reffile"-iter"$count"_map_sorted.bam
+	LogRun GenomeAnalysisTK.jar -T RealignerTargetCreator -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -o indel"$count".list
+	LogRun GenomeAnalysisTK.jar -T IndelRealigner -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -targetIntervals indel"$count".list -o "$samplename"-"$reffile"-iter"$count"_realign.bam
 
 if [ $count == $iter ]; then
 	# generate and correctly label consensus using cleaned bam on final iteration
-	LogRun samtools rmdup "$samplename"-"$reffile"-iter"$count"_map_sorted.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
+	LogRun samtools rmdup "$samplename"-"$reffile"-iter"$count"_realign.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
 	LogRun samtools view -bF4 -o "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
-	LogRun samtools index "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam
+	samtools index "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam
 
-	LogRun samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean.bam |
+	LogRun samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam |
 	 bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
 	LogRun vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf |
-	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
+	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fa
 
 	# mapping statistics
 	LogRun samtools flagstat "$samplename"-"$reffile"-iter"$count"_clean.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
-	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fas
+	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fa
+	reffile=${rfile%%.*}
 
 else
 
-	LogRun samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_map_sorted.bam |
-	 bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
+	LogRun samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_realign.bam |
+	 bcftools call -c - > "$samplename"-"$reffile"-iter"$count".vcf
 	LogRun vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf |
-	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fas
+	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fa
 
 	# mapping statistics
 	LogRun samtools flagstat "$samplename"-"$reffile"-iter"$count"_map_sorted.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
-	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fas
+	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fa
+	reffile=${rfile%%.*}
 
 fi
 	((count=count+1))
