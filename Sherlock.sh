@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-# Analysis steps required to find unknown infectious agent using Illumina shotgun sequence data from DNA/RNA extracted from host tissue.  Initially the host sequences are removed by mapping to the host (or closely related) genome.  
+# Analysis steps required to find unknown infectious agent using Illumina shotgun sequence data from DNA/RNA extracted
+# from host tissue.  Initially the host sequences are removed by mapping to the host (or closely related) genome.  
 
 # Pipeline by ellisrichardj making use of a variety of standard bioinformatic tools
 
@@ -25,7 +26,8 @@ set -e
 # Version 0.1.6 20/05/15 uses exisiting bwa index if it exists
 # Version 0.1.7 29/05/15 blast directly from this script without calling additional python script
 # Version 0.2.0 01/06/15 Revised to incorporate IterMap; mapping raw data to best hit(s) from blast search
-#			automatically generates output directory and file names based on input file names and accession numbers
+#			automatically generates output directory and file names based on input file names and accession
+#			numbers
 
 # set defaults for the options
 KVALUE=101
