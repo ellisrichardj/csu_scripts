@@ -4,7 +4,9 @@ set -e
 # script by ellisrichardj to iteratively map and call consensus, and then remap to
 # new consensus, thereby theoretically increasing coverage and accuracy of consensus,
 # especially when the consensus is likely to be divergent from original reference.
-# Experience suggests that bewteen 3 and 5 iterations are optimal for generating an accuarate consensus.
+# Experience suggests that bewteen 3 and 5 iterations are optimal for generating 
+# an accuarate consensus.  This consensus should be stable and will not chnage any 
+# further with subsequent iterations.
 
 # Requirements:
 #	bwa (tested with version 0.7.x)
@@ -36,8 +38,8 @@ set -e
 # Version 0.2.3 22/04/15 Changed mpileup to -Q0, removed bcftools view -c and -p 0.2, added bcftools -cg back in
 # Version 0.2.4 02/06/15 Appends iteration count to end of each fasta header
 # Version 0.2.5 12/06/15 Cleaned up logging of commands by defining LogRun function rather than using echo
-# Version 0.3.0 15/06/15 Adds headers to bam file during bwa mapping step.  This allows GATK to run without any additional
-#	BAM processing.  Uses GATK for local alignment around indels.  Updated to use samtools/bcftools 1.x
+# Version 0.3.0 16/06/15 Adds headers to bam file during bwa mapping step, allowing GATK to run without any additional
+#	bam processing.  Uses GATK for local alignment around indels.  Updated to use samtools/bcftools 1.x
 
 
 # set defaults for the options
@@ -78,6 +80,7 @@ Start=$(date +%s)
 	ref=$(basename "$Ref")
 	refname=${ref%%_*}
 	reffile=${ref%%.*}
+	consname=${ref%%.*}
 
 mkdir "$samplename"_IterMap"$iter"
 ln -s "$(readlink -f "$Ref")" "$samplename"_IterMap"$iter"/"$reffile".fa
@@ -92,10 +95,10 @@ if [ $minexpcov -lt 5 ]; then depth=1; else depth=10; fi
 threads=$(grep -c ^processor /proc/cpuinfo)
 
 # Log commands that are run
-echo -e "$now\n\tItermap v0.2.5 running with $threads cores\n\tThe following commands were run:\n"  > "$samplename"_IterMap"$iter".log
+echo -e "$now\n\tItermap v0.3.0 running with $threads cores\n\tThe following commands were run:\n"  > "$samplename"_IterMap"$iter".log
 # Define function to log commands and then run them
 LogRun(){
-echo "$@" >> "$samplename"_IterMap"$iter".log
+echo -e "\n$@" >> "$samplename"_IterMap"$iter".log
 eval "$@"
 }
 
@@ -115,29 +118,31 @@ eval "$@"
 	# mapping to original reference or most recently generated consensus
 	LogRun bwa index "$rfile"
 	LogRun samtools faidx "$rfile"
-	LogRun picard-tools CreateSequenceDictionary R="$rfile" O="$reffile".dict
+	LogRun picard-tools CreateSequenceDictionary R="$rfile" O=${rfile%%.*}.dict
 	LogRun bwa mem -T10 -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" -R '"@RG\tID:"$samplename"\tSM:"$samplename"\tLB:"$samplename""' "$rfile" R1.fastq.gz R2.fastq.gz |
 	 samtools view -Su - |
 	 samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted
 	samtools index "$samplename"-"$reffile"-iter"$count"_map_sorted.bam
-	LogRun GenomeAnalysisTK.jar -T RealignerTargetCreator -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -o indel"$count".list
-	LogRun GenomeAnalysisTK.jar -T IndelRealigner -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -targetIntervals indel"$count".list -o "$samplename"-"$reffile"-iter"$count"_realign.bam
+	LogRun GenomeAnalysisTK.jar -T RealignerTargetCreator -nt "$threads" -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -o indel"$count".list
+	LogRun GenomeAnalysisTK.jar -T IndelRealigner -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -targetIntervals indel"$count".list -maxReads 50000 -o "$samplename"-"$reffile"-iter"$count"_realign.bam
+	rm "$samplename"-"$reffile"-iter"$count"_map_sorted.bam
+	rm "$samplename"-"$reffile"-iter"$count"_map_sorted.bam.bai
 
 if [ $count == $iter ]; then
 	# generate and correctly label consensus using cleaned bam on final iteration
-	LogRun samtools rmdup "$samplename"-"$reffile"-iter"$count"_realign.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
+# rmdup does not work in v1.x of samtools so replace this with Picard equivalent	LogRun samtools rmdup "$samplename"-"$reffile"-iter"$count"_realign.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
+	LogRun picard-tools MarkDuplicates INPUT="$samplename"-"$reffile"-iter"$count"_realign.bam OUTPUT="$samplename"-"$reffile"-iter"$count"_clean.bam REMOVE_DUPLICATES=true METRICS_FILE=dup_metrics"$count".txt
 	LogRun samtools view -bF4 -o "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam "$samplename"-"$reffile"-iter"$count"_clean.bam
 	samtools index "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam
 
 	LogRun samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam |
-	 bcftools view -cg - > "$samplename"-"$reffile"-iter"$count".vcf
+	 bcftools call -c - > "$samplename"-"$reffile"-iter"$count".vcf
 	LogRun vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf |
 	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fa
 
 	# mapping statistics
 	LogRun samtools flagstat "$samplename"-"$reffile"-iter"$count"_clean.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
 	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fa
-	reffile=${rfile%%.*}
 
 else
 
@@ -149,7 +154,6 @@ else
 	# mapping statistics
 	LogRun samtools flagstat "$samplename"-"$reffile"-iter"$count"_map_sorted.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
 	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fa
-	reffile=${rfile%%.*}
 
 fi
 	((count=count+1))
@@ -160,7 +164,7 @@ complete=$(date '+%x %R')
 echo -e "Completed processing $complete"  >> "$samplename"_IterMap"$iter".log
 
 # generate pairwise alignment of reference and each iteration of the concensus
-cat *.fas > unaligned.fas
+cat *.fa > unaligned.fas
 clustalw -infile=unaligned.fas -outfile=Increments_aligned.fas -output=FASTA
 
 rm unaligned.fas
