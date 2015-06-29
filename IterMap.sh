@@ -80,7 +80,6 @@ Start=$(date +%s)
 	ref=$(basename "$Ref")
 	refname=${ref%%_*}
 	reffile=${ref%%.*}
-	consname=${ref%%.*}
 
 mkdir "$samplename"_IterMap"$iter"
 ln -s "$(readlink -f "$Ref")" "$samplename"_IterMap"$iter"/"$reffile".fa
