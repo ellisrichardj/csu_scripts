@@ -19,6 +19,7 @@
 # version 0.1.3 21/10/14	Bugfix to correct loss of first base when creating consensus
 # version 0.1.4 20/03/15	Changed default mimimum depth to 1 for very low coverage samples
 # version 0.1.5 17/04/15	Reduced defaults for Q and L options
+# version 0.1.6 21/07/15	Changed het options - 2 base combinations only
 
 
 use strict;
@@ -74,8 +75,7 @@ Options: -d INT    minimum depth                   [$opts{d}]
  
  close($fastaFile);
 
- my %het = (AC=>'M', AG=>'R', AT=>'W', CA=>'M', CG=>'S', CT=>'Y', CGT=>'B', AGT=>'D', ACT=>'H', ACG=>'V',
-			 GA=>'R', GC=>'S', GT=>'K', TA=>'W', TC=>'Y', TG=>'K');
+ my %het = (AC=>'M', CA=>'M', AG=>'R', GA=>'R', AT=>'W', TA=>'W', CG=>'S', GC=>'S', CT=>'Y', TC=>'Y', GT=>'K',  			TG=>'K');
 
   $last_chr = '';
   while (<>) {
