@@ -40,6 +40,7 @@ set -e
 # Version 0.2.5 12/06/15 Cleaned up logging of commands by defining LogRun function rather than using echo
 # Version 0.3.0 16/06/15 Adds headers to bam file during bwa mapping step, allowing GATK to run without any additional
 #	bam processing.  Uses GATK for local alignment around indels.  Updated to use samtools/bcftools 1.x
+# Version 0.3.1 03/08/15 Bug fix for generating mapping stats on realigned file
 
 
 # set defaults for the options
@@ -94,7 +95,7 @@ if [ $minexpcov -lt 5 ]; then depth=1; else depth=10; fi
 threads=$(grep -c ^processor /proc/cpuinfo)
 
 # Log commands that are run
-echo -e "$now\n\tItermap v0.3.0 running with $threads cores\n\tThe following commands were run:\n"  > "$samplename"_IterMap"$iter".log
+echo -e "$now\n\tItermap v0.3.1 running with $threads cores\n\tThe following commands were run:\n"  > "$samplename"_IterMap"$iter".log
 # Define function to log commands and then run them
 LogRun(){
 echo -e "\n$@" >> "$samplename"_IterMap"$iter".log
@@ -140,7 +141,7 @@ if [ $count == $iter ]; then
 	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fa
 
 	# mapping statistics
-	LogRun samtools flagstat "$samplename"-"$reffile"-iter"$count"_clean.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
+	LogRun samtools flagstat "$samplename"-"$reffile"-iter"$count"_realign.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
 	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fa
 
 else
@@ -151,7 +152,7 @@ else
 	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fa
 
 	# mapping statistics
-	LogRun samtools flagstat "$samplename"-"$reffile"-iter"$count"_map_sorted.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
+	LogRun samtools flagstat "$samplename"-"$reffile"-iter"$count"_realign.bam > "$samplename"-"$reffile"-iter"$count"_MappingStats.txt
 	rfile="$samplename"-"$reffile"-iter"$count"_consensus.fa
 
 fi
