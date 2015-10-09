@@ -26,8 +26,10 @@ set -e
 # Version 0.1.6 20/05/15 uses exisiting bwa index if it exists
 # Version 0.1.7 29/05/15 blast directly from this script without calling additional python script
 # Version 0.2.0 01/06/15 Revised to incorporate IterMap; mapping raw data to best hit(s) from blast search
-#			automatically generates output directory and file names based on input file names and accession
-#			numbers
+#			automatically generates output directory and file names based on input file names and 
+#			accession numbers
+# Version 0.2.1 04/08/15 Remove symlink to search data
+# Version 0.2.2 06/10/15 Bugfix for location of search database; using existing blast database if available
 
 # set defaults for the options
 KVALUE=101
@@ -109,16 +111,24 @@ velvetg "$OutputDir"/"$samplename"_nonHost_"$KVALUE" -exp_cov auto -cov_cutoff "
 
 cd "$OutputDir"
 #ln -s "$(readlink -f "$samplename"_nonHost_"$KVALUE"/contigs_singletons.fa)" contigs_singletons.fa
-ln -s "$(readlink -f "$PathToSearchData")" Reference.fasta
+#ln -s "$(readlink -f "$PathToSearchData")" Reference.fasta
+if [ -f "$PathToSearchData".nhr ]
+then 	echo "Using existing BLAST database"
+	SearchData="$(readlink -f "$PathToSearchData")"
+else 	echo "Generating local BLAST datbase" 
+	ln -s "$(readlink -f "$PathToSearchData")" SearchData.fa
+	makeblastdb -in "$SearchData" -parse_seqids -dbtype nucl
+	SearchData="$(readlink -f "SearchData.fa")"
+fi
 
-makeblastdb -in Reference.fasta -parse_seqids -dbtype nucl
 echo "BLASTing contigs against selected database"
-blastall -a "$threads" -b 5 -p blastn -d Reference.fasta -i "$samplename"_nonHost_"$KVALUE"/contigs.fa -o "$samplename"_"$refname"_crunch.txt -m 8 -e "$Blast_e_value"
+blastall -b 5 -p blastn -d "$SearchData" -i "$samplename"_nonHost_"$KVALUE"/contigs.fa -o "$samplename"_"$refname"_crunch.txt -m 8 -e "$Blast_e_value"
+# -a "$threads"
 
 # Extract the single sequence from blast output corresponding to the highest scoring match
 sort -k12,12 -rn "$samplename"_"$refname"_crunch.txt | head -1 - | awk '{print $2}' - > top_match.txt
 AccNo=$(sed -e 's/.*\([A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]\).*/\1/g'  top_match.txt)
-blastdbcmd -db Reference.fasta -entry_batch top_match.txt > "$AccNo".fas
+blastdbcmd -db "$SearchData" -entry_batch top_match.txt > "$AccNo".fas
 
 # Map original data to selected reference sequences and generate new consensus
 IterMap.sh -i4 "$AccNo".fas "$LEFT" "$RIGHT"
