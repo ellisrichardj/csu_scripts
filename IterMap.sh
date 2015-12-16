@@ -41,13 +41,15 @@ set -e
 # Version 0.3.0 16/06/15 Adds headers to bam file during bwa mapping step, allowing GATK to run without any additional
 #	bam processing.  Uses GATK for local alignment around indels.  Updated to use samtools/bcftools 1.x
 # Version 0.3.1 03/08/15 Bug fix for generating mapping stats on realigned file
-
+# Version 0.3.2 23/10/15 Reduce default values for minexpcov (=2) and minQ (=10); use -@ option to speed up sorting by
+#	samtools sort;
+# Version 0.3.3 30/10/15 Add -A to bcftools call command - keeps all alternate alleles
 
 # set defaults for the options
 
 iter=1
-minexpcov=5
-minQ=20
+minexpcov=2
+minQ=10
 
 # parse the options
 while getopts 'i:c:q:' opt ; do
@@ -121,7 +123,7 @@ eval "$@"
 	LogRun picard-tools CreateSequenceDictionary R="$rfile" O=${rfile%%.*}.dict
 	LogRun bwa mem -T10 -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" -R '"@RG\tID:"$samplename"\tSM:"$samplename"\tLB:"$samplename""' "$rfile" R1.fastq.gz R2.fastq.gz |
 	 samtools view -Su - |
-	 samtools sort - "$samplename"-"$reffile"-iter"$count"_map_sorted
+	 samtools sort -@ "$threads" - "$samplename"-"$reffile"-iter"$count"_map_sorted
 	samtools index "$samplename"-"$reffile"-iter"$count"_map_sorted.bam
 	LogRun GenomeAnalysisTK.jar -T RealignerTargetCreator -nt "$threads" -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -o indel"$count".list
 	LogRun GenomeAnalysisTK.jar -T IndelRealigner -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -targetIntervals indel"$count".list -maxReads 50000 -o "$samplename"-"$reffile"-iter"$count"_realign.bam
@@ -136,7 +138,7 @@ if [ $count == $iter ]; then
 	samtools index "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam
 
 	LogRun samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam |
-	 bcftools call -c - > "$samplename"-"$reffile"-iter"$count".vcf
+	 bcftools call -Ac - > "$samplename"-"$reffile"-iter"$count".vcf
 	LogRun vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf |
 	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fa
 
@@ -147,7 +149,7 @@ if [ $count == $iter ]; then
 else
 
 	LogRun samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_realign.bam |
-	 bcftools call -c - > "$samplename"-"$reffile"-iter"$count".vcf
+	 bcftools call -Ac - > "$samplename"-"$reffile"-iter"$count".vcf
 	LogRun vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf |
 	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fa
 
@@ -176,3 +178,4 @@ TimeTaken=$((End-Start))
 echo "Results are in "$samplename"_IterMap"$iter""
 echo "New consensus after "$iter" iterations: "$rfile""
 echo  | awk -v D=$TimeTaken '{printf "Performed '$iter' mapping iterations in: %02d'h':%02d'm':%02d's'\n",D/(60*60),D%(60*60)/60,D%60}'
+
