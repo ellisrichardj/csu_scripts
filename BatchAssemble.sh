@@ -17,10 +17,12 @@ set -e
 # Version 0.1.3 21/01/15 - Collates assembly statistics (N50, largest contig, total size, etc) for all samples
 #			and k-mers
 # Version 0.1.4 10/02/15 - Altered wildcard/filename pattern to allow for data merged with MergeFQ.sh
-# Version 0.2.0 03/03/15 - Performs assemblies with three k-mer values and now uses CISA to merge assemblies #			generated with multiple k-mers, added comments throughout script to help understand
+# Version 0.2.0 03/03/15 - Performs assemblies with three k-mer values and now uses CISA to merge assemblies 
+#			generated with multiple k-mers, added comments throughout script to help understand
 #			what the script is doing
 # Version 0.2.1 17/03/15 - Correct small error in on-screen messages, bug in symlinks to raw data files,
 #			move final assemblies into single directory
+# Version 0.2.2 16/12/15 - Extract assembly statistics for Final assembly
 
 
 # set our defaults for the options
@@ -111,7 +113,12 @@ echo "Assembling sample "$Count": "$samplename" with K=$LowerK and cutoff=$CUTOF
 	echo CISA=/usr/local/bioinf/CISA1.3 >> "$samplename"_CISA.config
 	CISA.py "$samplename"_CISA.config
 
-# add something here to extract CISA output assembly metrics
+# extract CISA output assembly metrics
+FinalSize=$(cat "$samplename"_CISA.fa | awk '$0 !~ ">" {c+=length($0);} END { print c; }')
+FinalContigs=$(grep -c '>' "$samplename"_CISA.fa)
+FinalMax=$(wc -L < "$samplename"_CISA.fa)
+FinalN50=$(cat "$samplename"_CISA.fa | awk '$0 ~ ">" {print c; c=0 "\t"; } $0 !~ ">" {c+=length($0);} END { print c; }' | sort -n | awk '{len[i++]=$1;sum+=$1} END {for (j=0;j<i+1;j++) {csum+=len[j]; if (csum>sum/2) {print len[j];break}}}')
+echo "$samplename"_CISA,"$FinalContigs","$FinalN50","$FinalMax","$FinalSize" >> $Statsfile
 
 	cp "$samplename"_CISA.fa $OutputDir
 	rm *.gz
