@@ -23,6 +23,8 @@ set -e
 # Version 0.2.1 17/03/15 - Correct small error in on-screen messages, bug in symlinks to raw data files,
 #			move final assemblies into single directory
 # Version 0.2.2 16/12/15 - Extract assembly statistics for Final assembly
+# Version 0.2.3 10/05/16 - Add CISA assembly stats table to Output directory, clean up intermediate files
+#			after each sample
 
 
 # set our defaults for the options
@@ -60,7 +62,8 @@ echo "Sample_k-mer, Nodes, N50, MaxContig, TotalSize," >> AssemblyStats.csv
 Statsfile=$(readlink -f AssemblyStats.csv)
 mkdir FinalAssemblies
 OutputDir=$(pwd)/"FinalAssemblies"
-
+echo "Sample_k-mer, Nodes, N50, MaxContig, TotalSize," >> "$OutputDir"/FinalAssemblyStats.csv
+FinalStats=$(readlink -f "$OutputDir"/FinalAssemblyStats.csv)
 
 # Run assembly for each sample
 for file in "$DataFolder"/*_R1*.gz
@@ -70,14 +73,14 @@ do
 	samplename=${fname%%_*}
 # Create new directory for each sample
 	mkdir "$samplename"_assembly
-	ln -s "$(readlink -f "$DataFolder"/"$samplename"*R1*.gz)" "$samplename"_assembly/"$samplename"_R1.fastq.gz
-	ln -s "$(readlink -f "$DataFolder"/"$samplename"*R2*.gz)" "$samplename"_assembly/"$samplename"_R2.fastq.gz
+#	ln -s "$(readlink -f "$DataFolder"/"$samplename"*R1*.gz)" "$samplename"_assembly/"$samplename"_R1.fastq.gz
+#	ln -s "$(readlink -f "$DataFolder"/"$samplename"*R2*.gz)" "$samplename"_assembly/"$samplename"_R2.fastq.gz
 	cd "$samplename"_assembly
 
 # Assemble sample using highest k-mer value
 	echo "Assembling sample "$Count": "$samplename" with K=$KVALUE and cutoff=$CUTOFF"
 
-	Velvet_assemble.sh -k "$KVALUE" -c "$CUTOFF" "$samplename" "$samplename"_R1.fastq.gz "$samplename"_R2.fastq.gz
+	Velvet_assemble.sh -k "$KVALUE" -c "$CUTOFF" "$samplename" "$DataFolder"/"$samplename"*R1*.gz "$DataFolder"/"$samplename"*R2*.gz
 
 	echo -e count=3 > "$samplename"_assemblies.txt
 	Assembly1=$(readlink -f "$samplename"_"$KVALUE"/*_contigs.fa)
@@ -87,7 +90,7 @@ do
 # Assemble sample using mid k-mer value
 echo "Assembling sample "$Count": "$samplename" with K=$MidK and cutoff=$CUTOFF"
 
-	Velvet_assemble.sh -k "$MidK" -c "$CUTOFF" "$samplename" "$samplename"_R1.fastq.gz "$samplename"_R2.fastq.gz
+	Velvet_assemble.sh -k "$MidK" -c "$CUTOFF" "$samplename" "$DataFolder"/"$samplename"*R1*.gz "$DataFolder"/"$samplename"*R2*.gz
 
 	Assembly2=$(readlink -f "$samplename"_"$MidK"/*_contigs.fa)
 	echo -e data="$Assembly2"",title="$samplename"_Velvet"$MidK"" >> "$samplename"_assemblies.txt
@@ -96,7 +99,7 @@ echo "Assembling sample "$Count": "$samplename" with K=$MidK and cutoff=$CUTOFF"
 # Assemble sample using lowest k-mer value
 echo "Assembling sample "$Count": "$samplename" with K=$LowerK and cutoff=$CUTOFF"
 
-	Velvet_assemble.sh -k "$LowerK" -c "$CUTOFF" "$samplename" "$samplename"_R1.fastq.gz "$samplename"_R2.fastq.gz
+	Velvet_assemble.sh -k "$LowerK" -c "$CUTOFF" "$samplename" "$DataFolder"/"$samplename"*R1*.gz "$DataFolder"/"$samplename"*R2*.gz
 
 	Assembly3=$(readlink -f "$samplename"_"$LowerK"/*_contigs.fa)
 	echo -e data="$Assembly3"",title="$samplename"_Velvet"$LowerK"" >> "$samplename"_assemblies.txt
@@ -114,15 +117,16 @@ echo "Assembling sample "$Count": "$samplename" with K=$LowerK and cutoff=$CUTOF
 	CISA.py "$samplename"_CISA.config
 
 # extract CISA output assembly metrics
-FinalSize=$(cat "$samplename"_CISA.fa | awk '$0 !~ ">" {c+=length($0);} END { print c; }')
-FinalContigs=$(grep -c '>' "$samplename"_CISA.fa)
-FinalMax=$(wc -L < "$samplename"_CISA.fa)
-FinalN50=$(cat "$samplename"_CISA.fa | awk '$0 ~ ">" {print c; c=0 "\t"; } $0 !~ ">" {c+=length($0);} END { print c; }' | sort -n | awk '{len[i++]=$1;sum+=$1} END {for (j=0;j<i+1;j++) {csum+=len[j]; if (csum>sum/2) {print len[j];break}}}')
-echo "$samplename"_CISA,"$FinalContigs","$FinalN50","$FinalMax","$FinalSize" >> $Statsfile
+	FinalSize=$(cat "$samplename"_CISA.fa | awk '$0 !~ ">" {c+=length($0);} END { print c; }')
+	FinalContigs=$(grep -c '>' "$samplename"_CISA.fa)
+	FinalMax=$(wc -L < "$samplename"_CISA.fa)
+	FinalN50=$(cat "$samplename"_CISA.fa | awk '$0 ~ ">" {print c; c=0 "\t"; } $0 !~ ">" {c+=length($0);} END { print c; }' | sort -n | awk '{len[i++]=$1;sum+=$1} END {for (j=0;j<i+1;j++) {csum+=len[j]; if (csum>sum/2) {print len[j];break}}}')
+	echo "$samplename"_CISA,"$FinalContigs","$FinalN50","$FinalMax","$FinalSize" >> $Statsfile
+	echo "$samplename"_CISA,"$FinalContigs","$FinalN50","$FinalMax","$FinalSize" >> $FinalStats
 
 	cp "$samplename"_CISA.fa $OutputDir
-	rm *.gz
 	cd ..
+	rm -rf "$samplename"_assembly
 done
 
 echo "Final Assemblies for "$Count" samples are in "$OutputDir""
