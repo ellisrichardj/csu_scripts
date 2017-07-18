@@ -31,6 +31,7 @@ set -e
 # Version 0.2.1 04/08/15 Remove symlink to search data
 # Version 0.2.2 06/10/15 Bugfix for location of search database; using existing blast database if available
 # Version 0.2.3 17/08/16 Update samtools commands for v1.3 (use -o for output)
+# Version 0.2.4 18/07/17 Subsample bam if required
 
 # set defaults for the options
 KVALUE=101
@@ -103,8 +104,19 @@ bwa mem -t "$threads" "$PathToHOST" "$LEFT" "$RIGHT" | samtools view -Su - | sam
 # Extract sequence reads that do not map to the host genome
 samtools view -@ "$threads" -b -f 4 "$OutputDir"/"$samplename"_"$hostname"_map_sorted.bam -o "$OutputDir"/"$samplename"_nonHost.bam
 
+# Subsample bam if necessary
+NonHostReads=$(samtools view -c "$OutputDir"/"$samplename"_nonHost.bam)
+MaxReads=1000000
+if [ $NonHostReads -gt $MaxReads ]
+	then 	Sub=$(echo "scale=1;  321+$MaxReads/$NonHostReads" | bc)
+			samtools view -bs "$Sub" "$OutputDir"/"$samplename"_nonHost.bam -o "$OutputDir"/"$samplename"_nonHost_subsample.bam
+			VelInBam="$OutputDir"/"$samplename"_nonHost_subsample.bam
+	else 	VelInBam="$OutputDir"/"$samplename"_nonHost.bam 
+fi
+
+
 # Denovo assembly of non-host reads
-velveth "$OutputDir"/"$samplename"_nonHost_"$KVALUE" "$KVALUE" -shortPaired -bam "$OutputDir"/"$samplename"_nonHost.bam
+velveth "$OutputDir"/"$samplename"_nonHost_"$KVALUE" "$KVALUE" -shortPaired -bam "$VelInBam"
 velvetg "$OutputDir"/"$samplename"_nonHost_"$KVALUE" -exp_cov auto -cov_cutoff "$CUTOFF" -ins_length 300 -clean yes -unused_reads yes
 #cat "$OutputDir"/"$samplename"_nonHost_"$KVALUE"/*.fa > "$OutputDir"/"$samplename"_nonHost_"$KVALUE"/contigs_singletons.fa
 
