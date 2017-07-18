@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# script by ellisrichardj
+# Automated processing of Illumina 16S data
+# This will process a directory of Illumina data accoring to the microbiome_helper SOP
+# The output will be ready for further QIIME analysis
+
+# Requirements:
+#	QIIME
+#	microbiome_helper (latest version available at: https://github.com/LangilleLab/microbiome_helper)
+#	Pear (latest version available at: https://github.com/frederic-mahe/PEAR)
+
+# Version 0.1.0 18/07/17 - Comments added and minor bug fixes
+
+
 Start=$(date +%s)
 
 # set defaults for the options
@@ -42,11 +55,20 @@ rm -rf $PathToOutput/filtered_reads/
 
 ~/microbiome_helper/create_qiime_map.pl $PathToOutput/fasta/* > $PathToOutput/map.txt
 
+echo "Created map file"
+echo ""
+echo "Creating combined fastq"
+echo ""
+
 qiime add_qiime_labels.py -i $PathToOutput/fasta -m $PathToOutput/map.txt -c FileInput -o $PathToOutput/combined_fasta
 
-qiime pick_open_reference_otus.py -i $PathToOutput/combined_fasta/combined_seqs.fna -o $PathToOutput/OTUs_out -aO $threads -p ~/Documents/Qiime_parameters.txt
+echo "Now Using Qiime to pick otus."
+echo "This may take some time!"
+echo ""
+
+qiime pick_open_reference_otus.py -i $PathToOutput/combined_fasta/combined_seqs.fna -o $PathToOutput/OTUs_out -p ~/Documents/Qiime_parameters.txt
 
 End=$(date +%s)
 TimeTaken=$((End-Start))
 echo "Results are in: "$PathToOutput"
-echo  | awk -v D=$TimeTaken '{printf "Performed Qiime Illumina processing in: %02d'h':%02d'm':%02d's'\n",D/(60*60),D%(60*60)/60,D%60}'
+echo  | awk -v D=$TimeTaken '{printf "Performed Illumina pre-processing and OTU picking in: %02d'h':%02d'm':%02d's'\n",D/(60*60),D%(60*60)/60,D%60}'"
