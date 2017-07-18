@@ -44,6 +44,7 @@ set -e
 # Version 0.3.2 23/10/15 Reduce default values for minexpcov (=2) and minQ (=10); use -@ option to speed up sorting by
 #	samtools sort;
 # Version 0.3.3 30/10/15 Add -A to bcftools call command - keeps all alternate alleles
+# Version 0.3.4 18/07/17 Minor bug fixes
 
 # set defaults for the options
 
@@ -123,7 +124,7 @@ eval "$@"
 	LogRun picard-tools CreateSequenceDictionary R="$rfile" O=${rfile%%.*}.dict
 	LogRun bwa mem -T10 -t "$threads" -k "$mem" -B "$mmpen" -O "$gappen" -R '"@RG\tID:"$samplename"\tSM:"$samplename"\tLB:"$samplename""' "$rfile" R1.fastq.gz R2.fastq.gz |
 	 samtools view -Su - |
-	 samtools sort -@ "$threads" - "$samplename"-"$reffile"-iter"$count"_map_sorted
+	 samtools sort -@ "$threads" - -o "$samplename"-"$reffile"-iter"$count"_map_sorted.bam
 	samtools index "$samplename"-"$reffile"-iter"$count"_map_sorted.bam
 	LogRun GenomeAnalysisTK.jar -T RealignerTargetCreator -nt "$threads" -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -o indel"$count".list
 	LogRun GenomeAnalysisTK.jar -T IndelRealigner -R "$rfile" -I "$samplename"-"$reffile"-iter"$count"_map_sorted.bam -targetIntervals indel"$count".list -maxReads 50000 -o "$samplename"-"$reffile"-iter"$count"_realign.bam
@@ -138,7 +139,7 @@ if [ $count == $iter ]; then
 	samtools index "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam
 
 	LogRun samtools mpileup -L 10000 -Q0 -AEupf "$rfile" "$samplename"-"$reffile"-iter"$count"_clean_mapOnly.bam |
-	 bcftools call -Ac - > "$samplename"-"$reffile"-iter"$count".vcf
+	 bcftools call -c - > "$samplename"-"$reffile"-iter"$count".vcf
 	LogRun vcf2consensus.pl consensus -d "$minexpcov" -Q "$minQ" -f "$rfile" "$samplename"-"$reffile"-iter"$count".vcf |
 	 sed '/^>/ s/-iter[0-9]//;/^>/ s/$/'-iter"$count"'/' - > "$samplename"-"$reffile"-iter"$count"_consensus.fa
 
