@@ -3,12 +3,13 @@ set -e
 
 # script by ellisrichardj
 # This will merge all files with matching names in each directory
-# Useful for merging data from 2 (or possible more) Illumina runs of the same samples
+# Useful for merging data from 2 (or possibly more) Illumina runs of the same samples
 # Merged files will be written to current working directory
 
 # Version 0.0.1 06/11/14
 # Version 0.1.1 22/01/15 - Altered to match sample names only rather than full file name
 # Version 0.1.2 10/02/15 - Allows two 'cat' processes to run concurrently
+# Version 0.1.3 18/07/17 - Minor bug fixes
 
 # check for mandatory positional parameters
 if [ $# -lt 2 ]; then
