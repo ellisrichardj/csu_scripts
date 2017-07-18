@@ -30,6 +30,7 @@ set -e
 #			accession numbers
 # Version 0.2.1 04/08/15 Remove symlink to search data
 # Version 0.2.2 06/10/15 Bugfix for location of search database; using existing blast database if available
+# Version 0.2.3 17/08/16 Update samtools commands for v1.3 (use -o for output)
 
 # set defaults for the options
 KVALUE=101
@@ -97,10 +98,10 @@ fi
 
 # Map raw data to host genome
 echo "Mapping raw reads to host reference genome"
-bwa mem -t "$threads" "$PathToHOST" "$LEFT" "$RIGHT" | samtools view -Su - | samtools sort - "$OutputDir"/"$samplename"_"$hostname"_map_sorted
+bwa mem -t "$threads" "$PathToHOST" "$LEFT" "$RIGHT" | samtools view -Su - | samtools sort -@ "$threads" -o "$OutputDir"/"$samplename"_"$hostname"_map_sorted.bam
 
 # Extract sequence reads that do not map to the host genome
-samtools view -b -f 4 "$OutputDir"/"$samplename"_"$hostname"_map_sorted.bam > "$OutputDir"/"$samplename"_nonHost.bam
+samtools view -@ "$threads" -b -f 4 "$OutputDir"/"$samplename"_"$hostname"_map_sorted.bam -o "$OutputDir"/"$samplename"_nonHost.bam
 
 # Denovo assembly of non-host reads
 velveth "$OutputDir"/"$samplename"_nonHost_"$KVALUE" "$KVALUE" -shortPaired -bam "$OutputDir"/"$samplename"_nonHost.bam
